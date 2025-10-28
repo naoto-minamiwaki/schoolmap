@@ -49,6 +49,14 @@
       display: block;
       margin-bottom: 4px;
     }
+    /* Leafletズームボタンの位置を右下に変更 */
+    .leaflet-control-zoom {
+      position: absolute !important;
+      right: 10px !important;
+      bottom: 10px !important;
+      top: auto !important;
+      left: auto !important;
+    }
   </style>
 </head>
 <body>
@@ -76,7 +84,7 @@
       "16016": "専修学校"
     };
 
-    // 各コードごとの色設定
+    // 各コードごとのマーカー色
     const colorMap = {
       "16001": "blue",
       "16002": "green",
@@ -93,16 +101,23 @@
       "16016": "black"
     };
 
-    // 地図の初期設定
-    const map = L.map('map').setView([35.0, 135.0], 7);
+    // 地図の初期設定（ズームコントロールを右下に配置）
+    const map = L.map('map', {
+      zoomControl: false // デフォルト位置（左上）を無効化
+    }).setView([35.0, 135.0], 7);
+
+    // タイルレイヤー
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18,
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
+    // ズームボタンを右下に追加
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
     // マーカークラスタ
     const markers = L.markerClusterGroup();
-    const allLayers = {}; // 種別ごとのレイヤー
+    const allLayers = {};
 
     // チェックボックス作成
     const checkboxContainer = document.getElementById("checkbox-container");
@@ -136,7 +151,6 @@
             const name = codeMap[code] || "不明";
             const color = colorMap[code] || "gray";
 
-            // カスタムマーカー
             const marker = L.circleMarker(latlng, {
               radius: 6,
               fillColor: color,
@@ -159,7 +173,7 @@
           }
         });
 
-        // 初期表示：全ての種別を追加
+        // 初期表示：全て追加
         for (const code in allLayers) {
           markers.addLayer(allLayers[code]);
         }
@@ -171,9 +185,9 @@
         console.error(err);
       });
 
-    // 表示更新処理
+    // 表示切り替え処理
     function updateVisibleLayers() {
-      markers.clearLayers(); // すべてクリア
+      markers.clearLayers();
       const selectedCodes = Array.from(
         checkboxContainer.querySelectorAll("input:checked")
       ).map(cb => cb.value);
