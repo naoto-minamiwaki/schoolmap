@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>教育施設マップ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- マーカークラスタ -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+  />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    .legend {
+      background: white;
+      padding: 8px;
+      line-height: 1.4;
+      border-radius: 4px;
+      box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script>
+    // 教育施設コード → 種別名
+    const codeMap = {
+      "16001": "小学校",
+      "16002": "中学校",
+      "16003": "中等教育学校",
+      "16004": "高等学校",
+      "16005": "高等専門学校",
+      "16006": "短期大学",
+      "16007": "大学",
+      "16011": "幼稚園",
+      "16012": "特別支援学校",
+      "16013": "幼保連携型認定こども園",
+      "16014": "義務教育学校",
+      "16015": "各種学校",
+      "16016": "専修学校"
+    };
+
+    // 地図の初期設定
+    const map = L.map('map').setView([35.0, 135.0], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // マーカークラスタグループ
+    const markers = L.markerClusterGroup();
+
+    // GeoJSONデータを読み込み
+    fetch('P29-23_13.geojson')
+      .then(response => {
+        if (!response.ok) throw new Error("GeoJSONの読み込みに失敗しました");
+        return response.json();
+      })
+      .then(data => {
+        const geojsonLayer = L.geoJSON(data, {
+          onEachFeature: function (feature, layer) {
+            const props = feature.properties;
+            const typeName = codeMap[props.P29_003] || "不明";
+            const popupContent = `
+              <strong>${props.P29_002 || "名称不明"}</strong><br>
+              種別: ${typeName}<br>
+              所在地: ${props.P29_004 || "不明"}
+            `;
+            layer.bindPopup(popupContent);
+          },
+          pointToLayer: function (feature, latlng) {
+            return L.marker(latlng);
+          }
+        });
+        markers.addLayer(geojsonLayer);
+        map.addLayer(markers);
+        map.fitBounds(markers.getBounds());
+      })
+      .catch(err => {
+        alert("GeoJSONの読み込みに失敗しました。コンソールを確認してください。");
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
