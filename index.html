@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GeoJSON 施設マップ (GitHub対応版)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <style>
+    body { margin:0; font-family: system-ui, "Hiragino Kaku Gothic ProN", "メイリオ", sans-serif; }
+    #map { height: 100vh; }
+    header { background: #ffffffcc; backdrop-filter: blur(6px); position: fixed; top: 0; width: 100%; z-index: 999; padding: 8px 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    select, input { padding: 4px 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>GeoJSON 施設マップ</strong>
+    <label>ファイルURL:
+      <input id="geojsonUrl" size="70" value="https://raw.githubusercontent.com/【ユーザー名】/【リポジトリ名】/main/P29-23_13.geojson">
+    </label>
+    <button id="loadBtn">読み込み</button>
+  </header>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script>
+    const codeMap = {
+      "16001": "小学校", "16002": "中学校", "16003": "中等教育学校",
+      "16004": "高等学校", "16005": "高等専門学校", "16006": "短期大学",
+      "16007": "大学", "16011": "幼稚園", "16012": "特別支援学校",
+      "16013": "幼保連携型認定こども園", "16014": "義務教育学校",
+      "16015": "各種学校", "16016": "専修学校"
+    };
+
+    const map = L.map('map').setView([35.68, 139.76], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const markers = L.markerClusterGroup();
+    map.addLayer(markers);
+
+    async function loadGeoJSON(url) {
+      markers.clearLayers();
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("読み込み失敗: " + res.status);
+        const geojson = await res.json();
+
+        geojson.features.forEach(f => {
+          const [lon, lat] = f.geometry.coordinates;
+          const p = f.properties || {};
+          const label = codeMap[p.P29_003] || "不明";
+          const popup = `
+            <b>${p.P29_004 || ''}</b><br>
+            ${p.P29_005 || ''}<br>
+            種別: ${label}<br>
+            コード: ${p.P29_003}
+          `;
+          markers.addLayer(L.marker([lat, lon]).bindPopup(popup));
+        });
+
+        const b = markers.getBounds();
+        if (b.isValid()) map.fitBounds(b.pad(0.1));
+      } catch (err) {
+        alert("エラー: " + err.message);
+      }
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', () => {
+      const url = document.getElementById('geojsonUrl').value.trim();
+      if (url) loadGeoJSON(url);
+    });
+  </script>
+</body>
+</html>
