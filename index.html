@@ -32,17 +32,31 @@
       width: 100%;
       height: 100%;
     }
-    .legend {
-      background: white;
-      padding: 8px;
-      line-height: 1.4;
-      border-radius: 4px;
-      box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    #control-box {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      max-height: 90%;
+      overflow-y: auto;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="control-box">
+    <strong>表示する種別を選択:</strong><br>
+    <div id="checkbox-container"></div>
+  </div>
 
   <script>
     // 教育施設コード → 種別名
@@ -62,6 +76,23 @@
       "16016": "専修学校"
     };
 
+    // 各コードごとの色設定
+    const colorMap = {
+      "16001": "blue",
+      "16002": "green",
+      "16003": "purple",
+      "16004": "red",
+      "16005": "orange",
+      "16006": "teal",
+      "16007": "darkred",
+      "16011": "pink",
+      "16012": "gray",
+      "16013": "gold",
+      "16014": "darkblue",
+      "16015": "brown",
+      "16016": "black"
+    };
+
     // 地図の初期設定
     const map = L.map('map').setView([35.0, 135.0], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -69,32 +100,69 @@
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // マーカークラスタグループ
+    // マーカークラスタ
     const markers = L.markerClusterGroup();
+    const allLayers = {}; // 種別ごとのレイヤー
 
-    // GeoJSONデータを読み込み
-    fetch('P29-23_13.geojson')
-      .then(response => {
-        if (!response.ok) throw new Error("GeoJSONの読み込みに失敗しました");
-        return response.json();
+    // チェックボックス作成
+    const checkboxContainer = document.getElementById("checkbox-container");
+    for (const [code, name] of Object.entries(codeMap)) {
+      const label = document.createElement("label");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = code;
+      checkbox.checked = true;
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(" " + name));
+      checkboxContainer.appendChild(label);
+
+      checkbox.addEventListener("change", updateVisibleLayers);
+    }
+
+    // GeoJSON読み込み
+    fetch("P29-23_13.geojson")
+      .then(res => {
+        if (!res.ok) throw new Error("GeoJSONの読み込みに失敗しました");
+        return res.json();
       })
       .then(data => {
-        const geojsonLayer = L.geoJSON(data, {
-          onEachFeature: function (feature, layer) {
-            const props = feature.properties;
-            const typeName = codeMap[props.P29_003] || "不明";
-            const popupContent = `
-              <strong>${props.P29_002 || "名称不明"}</strong><br>
-              種別: ${typeName}<br>
-              所在地: ${props.P29_004 || "不明"}
-            `;
-            layer.bindPopup(popupContent);
-          },
+        Object.keys(codeMap).forEach(code => {
+          allLayers[code] = L.layerGroup();
+        });
+
+        L.geoJSON(data, {
           pointToLayer: function (feature, latlng) {
-            return L.marker(latlng);
+            const code = feature.properties.P29_003;
+            const name = codeMap[code] || "不明";
+            const color = colorMap[code] || "gray";
+
+            // カスタムマーカー
+            const marker = L.circleMarker(latlng, {
+              radius: 6,
+              fillColor: color,
+              color: "#333",
+              weight: 1,
+              fillOpacity: 0.9
+            });
+
+            const props = feature.properties;
+            marker.bindPopup(`
+              <strong>${props.P29_002 || "名称不明"}</strong><br>
+              種別: ${name}<br>
+              所在地: ${props.P29_004 || "不明"}
+            `);
+
+            if (allLayers[code]) {
+              allLayers[code].addLayer(marker);
+            }
+            return marker;
           }
         });
-        markers.addLayer(geojsonLayer);
+
+        // 初期表示：全ての種別を追加
+        for (const code in allLayers) {
+          markers.addLayer(allLayers[code]);
+        }
         map.addLayer(markers);
         map.fitBounds(markers.getBounds());
       })
@@ -102,6 +170,17 @@
         alert("GeoJSONの読み込みに失敗しました。コンソールを確認してください。");
         console.error(err);
       });
+
+    // 表示更新処理
+    function updateVisibleLayers() {
+      markers.clearLayers(); // すべてクリア
+      const selectedCodes = Array.from(
+        checkboxContainer.querySelectorAll("input:checked")
+      ).map(cb => cb.value);
+      for (const code of selectedCodes) {
+        if (allLayers[code]) markers.addLayer(allLayers[code]);
+      }
+    }
   </script>
 </body>
 </html>
